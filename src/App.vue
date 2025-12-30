@@ -2,11 +2,26 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 
+type TickSummary = { ok: boolean; day: number; food_stock: number };
+type WorldState = { day: number; food_stock: number; npcs: NPC[] };
+type NPC = {
+  id: string;
+  name: string;
+  job: string;
+  hunger: number;
+  health: number;
+  mood: number;
+  alive: boolean;
+};
+
 const day = ref(0);
+const foodStock = ref(0);
+const npcs = ref<NPC[]>([]);
 const speed = ref(1);
 const isRunning = ref(true);
 const isTicking = ref(false);
 const errorMsg = ref("");
+const isResetting = ref(false);
 
 let timer: number | undefined;
 
@@ -15,12 +30,22 @@ async function advanceDay() {
   isTicking.value = true;
   errorMsg.value = "";
   try {
-    day.value = await invoke<number>("tick_day", { multiplier: 1 });
+    const result = await invoke<TickSummary>("api_time_tick", { multiplier: 1 });
+    day.value = result.day;
+    foodStock.value = result.food_stock;
+    await refreshState();
   } catch (err) {
     errorMsg.value = String(err);
   } finally {
     isTicking.value = false;
   }
+}
+
+async function refreshState() {
+  const state = await invoke<WorldState>("api_state");
+  day.value = state.day;
+  foodStock.value = state.food_stock;
+  npcs.value = Array.isArray(state.npcs) ? state.npcs : [];
 }
 
 function startTimer() {
@@ -53,7 +78,24 @@ function setSpeed(value: number) {
   }
 }
 
+async function resetState() {
+  if (isResetting.value) return;
+  isResetting.value = true;
+  errorMsg.value = "";
+  try {
+    await invoke("api_reset");
+    await refreshState();
+  } catch (err) {
+    errorMsg.value = String(err);
+  } finally {
+    isResetting.value = false;
+  }
+}
+
 onMounted(() => {
+  refreshState().catch((err) => {
+    errorMsg.value = String(err);
+  });
   if (isRunning.value) {
     startTimer();
   }
@@ -70,6 +112,16 @@ onBeforeUnmount(() => {
       <div class="day">
         Day <span>{{ day }}</span>
       </div>
+      <div class="meta">
+        <div class="stat">
+          <span>Food Stock</span>
+          <strong>{{ foodStock }}</strong>
+        </div>
+        <div class="stat">
+          <span>NPCs</span>
+          <strong>{{ npcs.length }}</strong>
+        </div>
+      </div>
       <div class="controls">
         <div class="speed">
           <button :class="{ active: speed === 1 }" @click="setSpeed(1)">
@@ -85,9 +137,29 @@ onBeforeUnmount(() => {
         <button class="toggle" @click="toggleRunning">
           {{ isRunning ? "Pause" : "Resume" }}
         </button>
+        <button class="reset" @click="resetState" :disabled="isResetting">
+          {{ isResetting ? "Resetting..." : "Reset" }}
+        </button>
       </div>
       <p class="hint">Speed changes tick interval from 1000ms to 200ms or 100ms.</p>
       <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
+      <div class="npc-list">
+        <h3>NPC Status</h3>
+        <div v-for="npc in npcs" :key="npc.id" class="npc-card">
+          <div class="npc-name">
+            <span>{{ npc.name }}</span>
+            <small>{{ npc.job }}</small>
+          </div>
+          <div class="npc-stats">
+            <span>Hunger {{ npc.hunger }}</span>
+            <span>Health {{ npc.health }}</span>
+            <span>Mood {{ npc.mood }}</span>
+            <span :class="{ dead: !npc.alive }">
+              {{ npc.alive ? "Alive" : "Dead" }}
+            </span>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 </template>
@@ -152,6 +224,74 @@ body {
   align-items: center;
 }
 
+.meta {
+  display: flex;
+  gap: 18px;
+}
+
+.stat {
+  flex: 1;
+  border-radius: 16px;
+  padding: 12px 16px;
+  background: #f8f6f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #3c3b47;
+}
+
+.stat strong {
+  font-size: 20px;
+  color: #0b1b33;
+}
+
+.npc-list {
+  display: grid;
+  gap: 12px;
+}
+
+.npc-list h3 {
+  margin: 8px 0 0;
+  font-size: 16px;
+  color: #0b1b33;
+}
+
+.npc-card {
+  border-radius: 16px;
+  padding: 12px 16px;
+  background: #fff;
+  box-shadow: 0 12px 24px rgba(12, 16, 34, 0.08);
+  display: grid;
+  gap: 8px;
+}
+
+.npc-name {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-weight: 600;
+  color: #1c1b29;
+}
+
+.npc-name small {
+  color: #777487;
+  font-weight: 500;
+}
+
+.npc-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 13px;
+  color: #4b4a57;
+}
+
+.npc-stats .dead {
+  color: #b12a28;
+  font-weight: 600;
+}
+
 .speed {
   display: flex;
   gap: 10px;
@@ -186,6 +326,18 @@ button.active {
   padding: 10px 22px;
 }
 
+.reset {
+  background: #f6d8b2;
+  color: #3a2719;
+  padding: 10px 22px;
+}
+
+.reset:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  box-shadow: none;
+}
+
 .hint {
   margin: 0;
   font-size: 14px;
@@ -205,6 +357,10 @@ button.active {
 @media (max-width: 640px) {
   .panel {
     padding: 24px;
+  }
+
+  .meta {
+    flex-direction: column;
   }
 
   .controls {

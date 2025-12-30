@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 
+use serde::Serialize;
+use serde_json::{json, Value};
 use tauri::path::BaseDirectory;
 use tauri::Manager;
 
@@ -65,8 +67,8 @@ impl PythonProcess {
         }
     }
 
-    fn tick(&mut self, multiplier: u32) -> Result<u64, String> {
-        writeln!(self.stdin, "{multiplier}")
+    fn send_command(&mut self, payload: Value) -> Result<Value, String> {
+        writeln!(self.stdin, "{}", payload)
             .map_err(|err| format!("failed to write to python: {err}"))?;
         self.stdin
             .flush()
@@ -81,11 +83,51 @@ impl PythonProcess {
             return Err("python process ended".to_string());
         }
 
-        let day = line
-            .trim()
-            .parse::<u64>()
-            .map_err(|err| format!("invalid python output: {err}"))?;
+        serde_json::from_str(line.trim())
+            .map_err(|err| format!("invalid python output: {err}"))
+    }
+
+    fn tick(&mut self, multiplier: u32) -> Result<u64, String> {
+        let response = self.send_command(json!({
+            "cmd": "tick",
+            "multiplier": multiplier,
+        }))?;
+        let response = require_ok(response)?;
+        let day = response
+            .get("day")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| "missing day in python response".to_string())?;
         Ok(day)
+    }
+
+    fn get_state(&mut self) -> Result<Value, String> {
+        let response = self.send_command(json!({ "cmd": "state" }))?;
+        let response = require_ok(response)?;
+        response
+            .get("state")
+            .cloned()
+            .ok_or_else(|| "missing state in python response".to_string())
+    }
+
+    fn get_logs(&mut self, limit: u32) -> Result<Value, String> {
+        let response = self.send_command(json!({
+            "cmd": "logs",
+            "limit": limit,
+        }))?;
+        let response = require_ok(response)?;
+        response
+            .get("logs")
+            .cloned()
+            .ok_or_else(|| "missing logs in python response".to_string())
+    }
+
+    fn reset_state(&mut self) -> Result<Value, String> {
+        let response = self.send_command(json!({ "cmd": "reset" }))?;
+        let response = require_ok(response)?;
+        response
+            .get("state")
+            .cloned()
+            .ok_or_else(|| "missing state in python response".to_string())
     }
 }
 
@@ -112,6 +154,60 @@ fn resolve_script_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 #[tauri::command]
 fn tick_day(app: tauri::AppHandle, multiplier: u32) -> Result<u64, String> {
+    with_python_process(app, |process| process.tick(multiplier))
+}
+
+#[derive(Serialize)]
+struct TickSummary {
+    ok: bool,
+    day: u64,
+    food_stock: i64,
+}
+
+#[tauri::command]
+fn api_state(app: tauri::AppHandle) -> Result<Value, String> {
+    with_python_process(app, |process| process.get_state())
+}
+
+#[tauri::command]
+fn api_time_tick(app: tauri::AppHandle, multiplier: u32) -> Result<TickSummary, String> {
+    let response = with_python_process(app, |process| {
+        process.send_command(json!({
+            "cmd": "tick",
+            "multiplier": multiplier,
+        }))
+    })?;
+    let response = require_ok(response)?;
+    let day = response
+        .get("day")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "missing day in python response".to_string())?;
+    let food_stock = response
+        .get("food_stock")
+        .and_then(Value::as_i64)
+        .ok_or_else(|| "missing food_stock in python response".to_string())?;
+    Ok(TickSummary {
+        ok: true,
+        day,
+        food_stock,
+    })
+}
+
+#[tauri::command]
+fn api_logs(app: tauri::AppHandle, limit: Option<u32>) -> Result<Value, String> {
+    let limit = limit.unwrap_or(20);
+    with_python_process(app, |process| process.get_logs(limit))
+}
+
+#[tauri::command]
+fn api_reset(app: tauri::AppHandle) -> Result<Value, String> {
+    with_python_process(app, |process| process.reset_state())
+}
+
+fn with_python_process<F, T>(app: tauri::AppHandle, action: F) -> Result<T, String>
+where
+    F: FnOnce(&mut PythonProcess) -> Result<T, String>,
+{
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -136,17 +232,38 @@ fn tick_day(app: tauri::AppHandle, multiplier: u32) -> Result<u64, String> {
         *guard = Some(PythonProcess::spawn(script_path, state_path.clone())?);
     }
 
-    guard
-        .as_mut()
-        .ok_or_else(|| "python process unavailable".to_string())?
-        .tick(multiplier)
+    action(
+        guard
+            .as_mut()
+            .ok_or_else(|| "python process unavailable".to_string())?,
+    )
+}
+
+fn require_ok(response: Value) -> Result<Value, String> {
+    if let Some(ok) = response.get("ok").and_then(Value::as_bool) {
+        if ok {
+            return Ok(response);
+        }
+        let error = response
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("python error");
+        return Err(error.to_string());
+    }
+    Ok(response)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![tick_day])
+        .invoke_handler(tauri::generate_handler![
+            tick_day,
+            api_state,
+            api_time_tick,
+            api_logs,
+            api_reset
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
