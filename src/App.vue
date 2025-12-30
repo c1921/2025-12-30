@@ -1,61 +1,107 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 
-const greetMsg = ref("");
-const name = ref("");
+const day = ref(0);
+const speed = ref(1);
+const isRunning = ref(true);
+const isTicking = ref(false);
+const errorMsg = ref("");
 
-async function greet() {
-  // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  greetMsg.value = await invoke("greet", { name: name.value });
+let timer: number | undefined;
+
+async function advanceDay() {
+  if (isTicking.value) return;
+  isTicking.value = true;
+  errorMsg.value = "";
+  try {
+    day.value = await invoke<number>("tick_day", { multiplier: 1 });
+  } catch (err) {
+    errorMsg.value = String(err);
+  } finally {
+    isTicking.value = false;
+  }
 }
+
+function startTimer() {
+  if (timer !== undefined) return;
+  timer = window.setInterval(() => {
+    advanceDay();
+  }, 1000 / speed.value);
+}
+
+function stopTimer() {
+  if (timer === undefined) return;
+  window.clearInterval(timer);
+  timer = undefined;
+}
+
+function toggleRunning() {
+  isRunning.value = !isRunning.value;
+  if (isRunning.value) {
+    startTimer();
+  } else {
+    stopTimer();
+  }
+}
+
+function setSpeed(value: number) {
+  speed.value = value;
+  if (isRunning.value) {
+    stopTimer();
+    startTimer();
+  }
+}
+
+onMounted(() => {
+  if (isRunning.value) {
+    startTimer();
+  }
+});
+
+onBeforeUnmount(() => {
+  stopTimer();
+});
 </script>
 
 <template>
-  <main class="container">
-    <h1>Welcome to Tauri + Vue</h1>
-
-    <div class="row">
-      <a href="https://vite.dev" target="_blank">
-        <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-      </a>
-      <a href="https://tauri.app" target="_blank">
-        <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-      </a>
-      <a href="https://vuejs.org/" target="_blank">
-        <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-      </a>
-    </div>
-    <p>Click on the Tauri, Vite, and Vue logos to learn more.</p>
-
-    <form class="row" @submit.prevent="greet">
-      <input id="greet-input" v-model="name" placeholder="Enter a name..." />
-      <button type="submit">Greet</button>
-    </form>
-    <p>{{ greetMsg }}</p>
+  <main class="shell">
+    <section class="panel">
+      <div class="day">
+        Day <span>{{ day }}</span>
+      </div>
+      <div class="controls">
+        <div class="speed">
+          <button :class="{ active: speed === 1 }" @click="setSpeed(1)">
+            1x
+          </button>
+          <button :class="{ active: speed === 5 }" @click="setSpeed(5)">
+            5x
+          </button>
+          <button :class="{ active: speed === 10 }" @click="setSpeed(10)">
+            10x
+          </button>
+        </div>
+        <button class="toggle" @click="toggleRunning">
+          {{ isRunning ? "Pause" : "Resume" }}
+        </button>
+      </div>
+      <p class="hint">Speed changes tick interval from 1000ms to 200ms or 100ms.</p>
+      <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
+    </section>
   </main>
 </template>
 
-<style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
-
-</style>
 <style>
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap");
+
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Space Grotesk", "Noto Sans", sans-serif;
   font-size: 16px;
-  line-height: 24px;
+  line-height: 1.5;
   font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
+  color: #0b1020;
+  background-color: #f4f3ef;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -63,98 +109,115 @@ async function greet() {
   -webkit-text-size-adjust: 100%;
 }
 
-.container {
+body {
   margin: 0;
-  padding-top: 10vh;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #f7e6d3, #e7eaf4 55%, #f1f1f1);
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.panel {
+  width: min(520px, 92vw);
+  padding: 32px;
+  border-radius: 28px;
+  background: #ffffffcc;
+  box-shadow: 0 30px 80px rgba(12, 16, 34, 0.15);
+  backdrop-filter: blur(18px);
+  display: grid;
+  gap: 18px;
+}
+
+.day {
+  font-size: 42px;
+  font-weight: 700;
+  color: #0b1b33;
+}
+
+.day span {
+  font-size: 56px;
+  color: #e26b49;
+}
+
+.controls {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
+.speed {
   display: flex;
-  justify-content: center;
+  gap: 10px;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 16px;
+  font-weight: 600;
   font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
   cursor: pointer;
+  background: #f2f3fb;
+  color: #25223a;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(37, 34, 58, 0.18);
 }
 
-input,
-button {
-  outline: none;
+button.active {
+  background: #0b1b33;
+  color: #fff5ea;
 }
 
-#greet-input {
-  margin-right: 5px;
+.toggle {
+  background: #e26b49;
+  color: #fff5ea;
+  padding: 10px 22px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+.hint {
+  margin: 0;
+  font-size: 14px;
+  color: #5c5a6b;
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #ffebe8;
+  color: #b12a28;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 24px;
   }
 
-  a:hover {
-    color: #24c8db;
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+  .speed {
+    justify-content: center;
   }
-  button:active {
-    background-color: #0f0f0f69;
+
+  .toggle {
+    width: 100%;
   }
 }
-
 </style>
