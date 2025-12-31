@@ -5,10 +5,51 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tauri + Vue + Typescript App</title>
+
   </head>
 
   <body>
-    <div id="app"></div>
+  <div
+    data-tauri-drag-region
+    class="fixed left-0 right-0 top-0 flex h-10 items-center justify-end gap-5 bg-base-300 select-none pr-6"
+  >
+    <button
+      class="btn btn-square btn-text" aria-label="Minimize"
+      id="titlebar-minimize"
+    >
+      <span class="icon-[tabler--minus] size-8 shrink-0"></span>
+    </button>
+    <button
+      class="btn btn-square btn-text"
+      aria-label="Maximize"
+      id="titlebar-maximize"
+    >
+      <span class="icon-[tabler--maximize] size-8 shrink-0"></span>
+    </button>
+    <button
+      class="btn btn-square btn-text"
+      aria-label="Close"
+      id="titlebar-close"
+    >
+      <span class="icon-[tabler--x] size-8 shrink-0"></span>
+    </button>
+  </div>
+    <div id="app" class="pt-8"></div>
     <script type="module" src="/src/main.ts"></script>
+  <script type="module">
+    import { getCurrentWindow } from '@tauri-apps/api/window';
+
+    const appWindow = getCurrentWindow();
+
+    document
+      .getElementById('titlebar-minimize')
+      ?.addEventListener('click', () => appWindow.minimize());
+    document
+      .getElementById('titlebar-maximize')
+      ?.addEventListener('click', () => appWindow.toggleMaximize());
+    document
+      .getElementById('titlebar-close')
+      ?.addEventListener('click', () => appWindow.close());
+  </script>
   </body>
 </html>
