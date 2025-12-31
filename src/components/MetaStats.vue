@@ -5,44 +5,18 @@ const { foodStock, aliveNpcCount } = useGameState();
 </script>
 
 <template>
-  <div class="meta">
-    <div class="stat">
+  <div class="flex flex-col gap-4.5 sm:flex-row">
+    <div
+      class="flex flex-1 items-center justify-between rounded-2xl bg-base-200 px-4 py-3 font-semibold text-base-content/80"
+    >
       <span>Food Stock</span>
-      <strong>{{ foodStock }}</strong>
+      <strong class="text-xl text-base-content">{{ foodStock }}</strong>
     </div>
-    <div class="stat">
+    <div
+      class="flex flex-1 items-center justify-between rounded-2xl bg-base-200 px-4 py-3 font-semibold text-base-content/80"
+    >
       <span>NPCs</span>
-      <strong>{{ aliveNpcCount }}</strong>
+      <strong class="text-xl text-base-content">{{ aliveNpcCount }}</strong>
     </div>
   </div>
 </template>
-
-<style scoped>
-.meta {
-  display: flex;
-  gap: 18px;
-}
-
-.stat {
-  flex: 1;
-  border-radius: 16px;
-  padding: 12px 16px;
-  background: #f8f6f0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 600;
-  color: #3c3b47;
-}
-
-.stat strong {
-  font-size: 20px;
-  color: #0b1b33;
-}
-
-@media (max-width: 640px) {
-  .meta {
-    flex-direction: column;
-  }
-}
-</style>
