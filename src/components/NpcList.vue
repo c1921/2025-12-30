@@ -8,7 +8,7 @@ const { npcs } = useGameState();
   <div class="grid gap-3">
     <h3 class="text-base font-semibold text-base-content">NPC Status</h3>
     <div class="h-56 overflow-x-auto w-full">
-      <table class="table-xs table-pin-rows table-pin-cols table">
+      <table class="table-pin-rows table-pin-cols table">
         <thead>
           <tr>
             <th>Name</th>
@@ -29,7 +29,7 @@ const { npcs } = useGameState();
             <td>{{ npc.mood }}</td>
             <td>
               <span
-                class="badge badge-soft text-xs"
+                class="badge text-xs"
                 :class="npc.alive ? 'badge-success' : 'badge-error'"
               >
                 {{ npc.alive ? "Alive" : "Dead" }}

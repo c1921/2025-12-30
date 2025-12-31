@@ -14,28 +14,28 @@ const {
 
 <template>
   <div
-    class="flex flex-wrap items-center gap-3 sm:gap-4"
+    class="flex flex-wrap items-center gap-3"
   >
-    <div class="font-bold">
+    <div>
       Day <span class="text-primary">{{ day }}</span>
     </div>
     <div class="join">
       <button
-        class="btn btn-sm join-item"
+        class="btn join-item"
         :class="speed === 1 ? 'btn-primary' : ''"
         @click="setSpeed(1)"
       >
         1x
       </button>
       <button
-        class="btn btn-sm join-item"
+        class="btn join-item"
         :class="speed === 5 ? 'btn-primary' : ''"
         @click="setSpeed(5)"
       >
         5x
       </button>
       <button
-        class="btn btn-sm join-item"
+        class="btn join-item"
         :class="speed === 10 ? 'btn-primary' : ''"
         @click="setSpeed(10)"
       >
@@ -43,7 +43,7 @@ const {
       </button>
     </div>
     <button
-      class="btn btn-sm btn-square"
+      class="btn btn-square"
       :class="isRunning ? '' : 'btn-error'"
       @click="toggleRunning"
       :aria-label="isRunning ? 'Pause' : 'Resume'"
@@ -53,7 +53,7 @@ const {
         :class="isRunning ? 'icon-[tabler--player-pause]' : 'icon-[tabler--player-play]'"
       ></span>
     </button>
-    <button class="btn btn-sm btn-warning" @click="resetState" :disabled="isResetting">
+    <button class="btn btn-warning" @click="resetState" :disabled="isResetting">
       {{ isResetting ? "Resetting..." : "Reset" }}
     </button>
   </div>

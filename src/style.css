@@ -13,3 +13,44 @@
 /* @import "flyonui/src/vendor/raty.css"; */
 /* @import "flyonui/src/vendor/waves.css"; */
 /* @import "flyonui/src/vendor/apexcharts.css"; */
+
+@layer base {
+    html {
+        font-size: 12px;
+    }
+}
+
+@plugin "flyonui/theme" {
+    name: "mydark";
+    default: false;
+    prefersdark: false;
+    color-scheme: "dark";
+    --color-base-100: oklch(15.5% 0 0);
+    --color-base-200: oklch(12.5% 0 0);
+    --color-base-300: oklch(7.8% 0 0);
+    --color-base-content: oklch(77.4% 0.029 256.847);
+    --color-primary: oklch(62.7% 0.146 260.9);
+    --color-primary-content: oklch(96% 0.018 271.7);
+    --color-secondary: oklch(61.3% 0.188 313.7);
+    --color-secondary-content: oklch(94% 0.028 342.258);
+    --color-accent: oklch(39.8% 0.161 283.1);
+    --color-accent-content: oklch(84.8% 0.063 143.9);
+    --color-neutral: oklch(30.2% 0 0);
+    --color-neutral-content: oklch(92% 0.004 286.32);
+    --color-info: oklch(55.1% 0.107 232.661);
+    --color-info-content: oklch(87% 0.066 243.157);
+    --color-success: oklch(31.2% 0.082 163.223);
+    --color-success-content: oklch(84% 0.077 168.94);
+    --color-warning: oklch(50.7% 0.189 84.429);
+    --color-warning-content: oklch(95.7% 0.112 45.904);
+    --color-error: oklch(32.7% 0.14 21.9);
+    --color-error-content: oklch(82.1% 0.105 12.094);
+    --radius-selector: 0.5rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.1875rem;
+    --size-field: 0.1875rem;
+    --border: 1px;
+    --depth: 0;
+    --noise: 0;
+}
